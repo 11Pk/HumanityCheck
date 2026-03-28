@@ -1,14 +1,5 @@
-// ============================================================
-//  HumanityCheck — twitterProfile.js
-//  Pure frontend bot detector — no backend needed
-//  Called from index.js when user is on twitter.com / x.com
-// ============================================================
-
 let lastUrl = "";
 
-// ─────────────────────────────────────────────────────────────
-//  HELPER — convert "12.4K" / "1.2M" → real number
-// ─────────────────────────────────────────────────────────────
 function parseCount(str) {
   if (!str) return 0;
   str = str.replace(/,/g, "").trim();
@@ -17,10 +8,6 @@ function parseCount(str) {
   if (str.endsWith("B") || str.endsWith("b")) return Math.round(parseFloat(str) * 1000000000);
   return parseInt(str) || 0;
 }
-
-// ─────────────────────────────────────────────────────────────
-//  STEP 1 — SCRAPE : read every signal from the page DOM
-// ─────────────────────────────────────────────────────────────
 function scrapeProfileData() {
   const d = {};
 
@@ -66,24 +53,29 @@ function scrapeProfileData() {
     ? parseFloat((d.followers / d.following).toFixed(2))
     : (d.followers > 0 ? 999 : 0);
 
-  // Profile photo — default photo URL contains "default_profile"
+  // Profile photo
   const photoEl  = document.querySelector('[data-testid^="UserAvatar-Container"] img');
   const photoSrc = photoEl?.src || "";
   d.hasDefaultPhoto = photoSrc === "" || photoSrc.includes("default_profile");
 
-  // Header / banner image
+  // Header image
   const headerEl = document.querySelector('a[href$="/photo"] img, [style*="profile_banners"]');
   d.hasHeaderImage = !!headerEl;
 
-  // Verified blue tick
-  const verifiedEl = document.querySelector('[data-testid="icon-verified"]');
-  d.isVerified = !!verifiedEl;
+  // Verified 
+  const userNameBlock  = document.querySelector('[data-testid="UserName"]');
+  const verifiedEl     = userNameBlock?.querySelector('[data-testid="icon-verified"], svg[aria-label*="erified"]');
+  const verifiedByLabel = document.querySelector(
+    '[data-testid="UserName"] [aria-label="Verified account"], ' +
+    '[data-testid="UserName"] [aria-label="Blue Verified"]'
+  );
+  d.isVerified = !!(verifiedEl || verifiedByLabel);
 
   // Pinned tweet
   const pinnedEl = document.querySelector('[data-testid="socialContext"]');
   d.hasPinnedTweet = pinnedEl?.innerText?.toLowerCase().includes("pinned") || false;
 
-  // Visible tweets (up to 10) for repetition check
+  // Visible tweets
   const tweetEls = document.querySelectorAll('[data-testid="tweetText"]');
   d.visibleTweets   = Array.from(tweetEls).slice(0, 10).map(el => el.innerText.trim());
   d.tweetCount      = d.visibleTweets.length;
@@ -92,7 +84,7 @@ function scrapeProfileData() {
     ? parseFloat(((d.tweetCount - uniqueSet.size) / d.tweetCount).toFixed(2))
     : 0;
 
-  // Profile completeness (0–100)
+  // Profile completeness
   let completeness = 0;
   if (d.displayName)      completeness += 15;
   if (d.hasBio)           completeness += 25;
@@ -103,26 +95,84 @@ function scrapeProfileData() {
   if (d.hasPinnedTweet)   completeness += 5;
   d.completeness = completeness;
 
+  // Username pattern
+  const usernameEl = document.querySelector('[data-testid="UserName"] div + div span');
+  d.username = usernameEl?.innerText?.trim() || "";
+  const usernameClean = d.username.replace("@", "");
+  d.hasNumbersInUsername = /\d{4,}/.test(usernameClean);
+  d.hasRandomUsername    = /[_]{2,}|[0-9]{4,}/.test(usernameClean);
+
+  // Tweet timestamps
+  const timeEls    = document.querySelectorAll('article time');
+  const timestamps = Array.from(timeEls)
+    .slice(0, 10)
+    .map(el => new Date(el.getAttribute('datetime')).getTime())
+    .filter(Boolean);
+  d.timestamps = timestamps;
+
+  if (timestamps.length >= 3) {
+    const gaps = [];
+    for (let i = 1; i < timestamps.length; i++) {
+      gaps.push(Math.abs(timestamps[i - 1] - timestamps[i]));
+    }
+    const avgGap   = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+    const variance = gaps.reduce((a, b) => a + Math.pow(b - avgGap, 2), 0) / gaps.length;
+    d.postingVariance  = variance;
+    d.isRoboticPosting = variance < 60000 && gaps.length >= 3;
+  } else {
+    d.postingVariance  = null;
+    d.isRoboticPosting = false;
+  }
+
+  // Bio keywords
+  const botBioKeywords = [
+    "ai", "bot", "automated", "crypto", "nft", "trading signals",
+    "dm for promo", "follow back", "not financial advice", "web3",
+    "📈", "🚀", "💰", "buying followers", "get rich"
+  ];
+  d.bioHasBotKeywords = d.bio
+    ? botBioKeywords.some(k => d.bio.toLowerCase().includes(k))
+    : false;
+
+  // Hashtag repetition
+  const tweetTexts     = d.visibleTweets.join(" ").toLowerCase();
+  const hashtags       = tweetTexts.match(/#\w+/g) || [];
+  const uniqueHashtags = new Set(hashtags);
+  d.hashtagRepetitionRatio = hashtags.length > 0
+    ? parseFloat(((hashtags.length - uniqueHashtags.size) / hashtags.length).toFixed(2))
+    : 0;
+
+  // Post count vs followers
+  const headerText = document.querySelector('[data-testid="primaryColumn"] h2')?.closest('div')?.innerText || "";
+  const postMatch  = headerText.match(/([\d,.KMBkmb]+)\s*[Pp]osts?/);
+  d.postCount      = postMatch ? parseCount(postMatch[1]) : null;
+  d.highPostLowFollower = d.postCount !== null && d.postCount > 5000 && d.followers < 500;
+
+  // Name vs username mismatch
+  const displayNameClean    = (d.displayName || "").toLowerCase().replace(/\s/g, "");
+  const usernameOnlyLetters = usernameClean.toLowerCase().replace(/[^a-z]/g, "");
+  d.nameMismatch = displayNameClean.length > 0
+    && usernameOnlyLetters.length > 0
+    && !displayNameClean.includes(usernameOnlyLetters.slice(0, 4))
+    && !usernameOnlyLetters.includes(displayNameClean.slice(0, 4));
+
   return d;
 }
 
-// ─────────────────────────────────────────────────────────────
-//  STEP 2 — SCORE : 11 signals → 0-100 human probability score
-// ─────────────────────────────────────────────────────────────
 function scoreProfile(d) {
   let score       = 50;
   const flags     = [];
   const positives = [];
 
-  // Signal 1 — Verified badge
+  //  Verified badge
   if (d.isVerified) { score += 20; positives.push("Verified account"); }
 
-  // Signal 2 — Profile completeness
+  // Profile completeness
   if      (d.completeness >= 70) { score += 12; positives.push("Complete profile"); }
   else if (d.completeness >= 40) { score += 4; }
   else if (d.completeness <  25) { score -= 20; flags.push("Very incomplete profile"); }
 
-  // Signal 3 — Bio
+  //  Bio
   if (!d.hasBio) {
     score -= 10; flags.push("No bio set");
   } else {
@@ -130,11 +180,11 @@ function scoreProfile(d) {
     if (d.bio && d.bio.length < 10) { score -= 4; flags.push("Bio too short"); }
   }
 
-  // Signal 4 — Profile photo
+  //  Profile photo
   if (d.hasDefaultPhoto) { score -= 18; flags.push("No profile photo"); }
   else                   { score += 8; }
 
-  // Signal 5 — Account age
+  //  Account age
   if (d.accountAgeDays !== null) {
     if      (d.accountAgeDays < 7)   { score -= 25; flags.push("Account under 7 days old"); }
     else if (d.accountAgeDays < 30)  { score -= 18; flags.push("Account under 30 days old"); }
@@ -143,33 +193,55 @@ function scoreProfile(d) {
     else if (d.accountAgeDays > 365) { score += 10; positives.push("Account over 1 year old"); }
   }
 
-  // Signal 6 — Follower / following ratio
+  //  Follower / following ratio
   if      (d.following > 500  && d.ratio < 0.05) { score -= 22; flags.push("Mass following, very few followers"); }
   else if (d.following > 1000 && d.ratio < 0.1)  { score -= 15; flags.push("High following, low follower ratio"); }
   else if (d.ratio >= 1.0) { score += 10; positives.push("Good follower ratio"); }
   else if (d.ratio >= 0.3) { score += 5; }
 
-  // Signal 7 — Absolute follower count
+  // Absolute follower count
   if (d.followers < 5 && (d.accountAgeDays || 0) > 90) {
     score -= 12; flags.push("Very few followers for account age");
   }
 
-  // Signal 8 — Tweet repetition
+  // Tweet repetition
   if      (d.repetitionRatio > 0.5 && d.tweetCount >= 5) { score -= 20; flags.push("Highly repetitive tweets"); }
   else if (d.repetitionRatio > 0.3 && d.tweetCount >= 5) { score -= 10; flags.push("Some repetitive tweets"); }
 
-  // Signal 9 — Header image
+  // Header image
   if (!d.hasHeaderImage) { score -= 5; flags.push("No header image"); }
   else                   { score += 4; }
 
-  // Signal 10 — Location & website
+  // Location & website
   if (d.hasLocation) score += 4;
   if (d.hasWebsite)  score += 4;
 
-  // Signal 11 — Pinned tweet
+  // Pinned tweet
   if (d.hasPinnedTweet) { score += 5; positives.push("Has pinned tweet"); }
 
-  // Clamp 0–100
+  // Username numbers
+  if (d.hasNumbersInUsername) { score -= 10; flags.push("Username contains many numbers"); }
+
+  //  Robotic posting
+  if (d.isRoboticPosting) {
+    score -= 20; flags.push("Tweets posted at robotic intervals");
+  } else if (d.timestamps.length >= 3) {
+    score += 5; positives.push("Natural posting intervals");
+  }
+
+  //  Bot keywords in bio
+  if (d.bioHasBotKeywords) { score -= 15; flags.push("Bio contains bot/spam keywords"); }
+
+  //  Hashtag spam
+  if      (d.hashtagRepetitionRatio > 0.6) { score -= 15; flags.push("Repetitive hashtag usage"); }
+  else if (d.hashtagRepetitionRatio > 0.4) { score -= 7;  flags.push("Some hashtag repetition"); }
+
+  //  High posts, low followers
+  if (d.highPostLowFollower) { score -= 18; flags.push("Thousands of posts but very few followers"); }
+
+  //  Name/username mismatch
+  if (d.nameMismatch && d.hasNumbersInUsername) { score -= 8; flags.push("Display name doesn't match username"); }
+
   score = Math.max(0, Math.min(100, Math.round(score)));
 
   let label, color, emoji;
@@ -180,9 +252,6 @@ function scoreProfile(d) {
   return { score, label, color, emoji, flags, positives };
 }
 
-// ─────────────────────────────────────────────────────────────
-//  STEP 3 — DISPLAY : inject floating overlay card on the page
-// ─────────────────────────────────────────────────────────────
 function showOverlay(result, d) {
   document.getElementById("hc-overlay")?.remove();
 
@@ -206,6 +275,9 @@ function showOverlay(result, d) {
   const ageLine = d.accountAgeDays !== null
     ? `<div>📅 Age: <b>${d.accountAgeDays} days</b></div>` : "";
 
+  const postCountLine = d.postCount !== null
+    ? `<div>📝 Posts: <b>${d.postCount.toLocaleString()}</b></div>` : "";
+
   overlay.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <span style="font-weight:600;font-size:14px">HumanityCheck</span>
@@ -221,18 +293,7 @@ function showOverlay(result, d) {
     <div style="background:#f7f9f9;border-radius:8px;height:8px;margin:8px 0 14px;overflow:hidden">
       <div style="height:100%;width:${result.score}%;background:${result.color};
                   border-radius:8px;transition:width 0.6s ease"></div>
-    </div>
-    <div style="background:#f7f9f9;border-radius:10px;padding:10px 12px;
-                font-size:12px;line-height:1.9;margin-bottom:10px">
-      <div>👥 Followers: <b>${d.followers.toLocaleString()}</b></div>
-      <div>➡️ Following: <b>${d.following.toLocaleString()}</b></div>
-      <div>📊 Ratio: <b>${d.ratio}</b></div>
-      ${ageLine}
-      <div>✏️ Bio: <b>${d.hasBio ? "Set" : "Missing"}</b></div>
-      <div>🖼 Photo: <b>${d.hasDefaultPhoto ? "Default ⚠️" : "Custom ✓"}</b></div>
-      <div>📋 Completeness: <b>${d.completeness}%</b></div>
-      ${d.isVerified ? `<div>✔️ <b>Verified</b></div>` : ""}
-    </div>
+      </div>
     ${posHtml || flagsHtml ? `
     <div style="font-size:12px;line-height:1.8;padding:0 2px;margin-bottom:8px">
       ${posHtml}${flagsHtml}
@@ -248,14 +309,10 @@ function showOverlay(result, d) {
 
   document.getElementById("hc-close").addEventListener("click", () => overlay.remove());
 
-  // Notify popup
   chrome.runtime.sendMessage({ action: "PROFILE_RESULT", result, data: d });
 }
 
-// ─────────────────────────────────────────────────────────────
-//  MAIN — scrape → score → display
-// ─────────────────────────────────────────────────────────────
-export function runProfileAnalysis() {
+function runProfileAnalysis() {
   console.log("[HumanityCheck] Analyzing Twitter profile...");
   const data   = scrapeProfileData();
   const result = scoreProfile(data);
@@ -263,9 +320,6 @@ export function runProfileAnalysis() {
   showOverlay(result, data);
 }
 
-// ─────────────────────────────────────────────────────────────
-//  AUTO-DETECT — watch for Twitter SPA navigation
-// ─────────────────────────────────────────────────────────────
 const NON_PROFILE = new Set([
   "home","explore","notifications","messages",
   "search","settings","i","compose","lists","bookmarks"
@@ -276,12 +330,21 @@ function isProfilePage(path) {
   return first && first.length > 0 && !NON_PROFILE.has(first) && !path.includes("/status/");
 }
 
+function waitAndRun(retries = 10) {
+  const nameEl = document.querySelector('[data-testid="UserName"]');
+  if (nameEl) {
+    runProfileAnalysis();
+  } else if (retries > 0) {
+    setTimeout(() => waitAndRun(retries - 1), 800);
+  }
+  }
+
 function checkNavigation() {
   const current = window.location.href;
   if (current === lastUrl) return;
   lastUrl = current;
   if (isProfilePage(window.location.pathname)) {
-    setTimeout(runProfileAnalysis, 4000);
+          waitAndRun();
   }
 }
 
