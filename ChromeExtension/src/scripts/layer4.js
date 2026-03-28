@@ -62,6 +62,6 @@ export async function startLayer4() {
     console.log("Layer 4 score:", score);
     return score;
   } finally {
-    isLayer4Active = false; // ✅ always resets, even on error
+    isLayer4Active = false; //  always resets, even on error
   }
 }
