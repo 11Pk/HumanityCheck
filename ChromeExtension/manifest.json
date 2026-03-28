@@ -1,3 +1,4 @@
+
 {
   "manifest_version": 3,
   "name": "Humanity Check",
@@ -7,20 +8,27 @@
     "default_popup": "index.html"
   },
 
-  "permissions": ["activeTab", "scripting"],
-    "host_permissions": [
-    "https://web.telegram.org/*",
-    "https://twitter.com/*",
-    "https://x.com/*",
-    "https://meet.google.com/*",
-    "https://leetcode.com/*",
-    "https://hackerrank.com/*"
+  "permissions": [
+    "tabs",
+    "scripting",
+    "tabCapture",
+    "offscreen"
+  ],
+
+  "host_permissions": [
+    "<all_urls>"
   ],
 
   "content_scripts": [
     {
-      "matches": ["*://web.telegram.org/*","*://twitter.com/*",
-        "*://x.com/*","https://meet.google.com/*", "https://leetcode.com/*", "https://hackerrank.com/*"],
+      "matches": [
+        "*://web.telegram.org/*",
+        "*://twitter.com/*",
+        "*://x.com/*",
+        "https://meet.google.com/*",
+        "https://leetcode.com/*",
+        "https://hackerrank.com/*"
+      ],
       "js": ["src/scripts/index.js"],
       "type": "module"
     }
@@ -28,5 +36,12 @@
 
   "background": {
     "service_worker": "src/background/background.js"
-  }
+  },
+
+  "web_accessible_resources": [
+    {
+      "resources": ["src/audio/offscreen1.html", "src/audio/offscreen1.js"],
+      "matches": ["<all_urls>"]
+    }
+  ]
 }
