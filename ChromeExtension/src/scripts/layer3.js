@@ -13,9 +13,9 @@ async function startCamera() {
     video.style.right = "10px";
     video.style.width = "200px";
     video.style.zIndex = "9999";
-     video.style.display = "none";
+    video.style.display = "none";
     document.body.appendChild(video);
-
+    
     return video;
 
   } catch (err) {

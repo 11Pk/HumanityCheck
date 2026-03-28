@@ -1,6 +1,6 @@
 
 from fastapi import FastAPI, File, UploadFile
-from services.audio_analyzer import analyze_audio
+# from services.audio_analyzer import analyze_audio
 from routes.chat import router as chat_router
 from fastapi.middleware.cors import CORSMiddleware
 

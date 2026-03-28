@@ -30,6 +30,7 @@ def chat_check(data: ChatRequest):
     ]
 
     # Call ML logic
+    print("POST HIT")
     result = analyze_chat(chat_data)
 
     return result

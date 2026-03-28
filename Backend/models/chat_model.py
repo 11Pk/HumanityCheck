@@ -5,7 +5,7 @@ from sentence_transformers import SentenceTransformer
 # Load SBERT model (used for semantic similarity)
 model = SentenceTransformer('all-MiniLM-L6-v2')
 
-# 1. RESPONSE TIME 
+# 1.RESPONSE TIME 
 def response_time_score(chat):
     """
     We measure how fast 'other' replies after 'me'.
@@ -138,3 +138,5 @@ def analyze_chat(chat):
             # "conversation": round(conv, 2)
         }
     }
+
+
