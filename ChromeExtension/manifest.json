@@ -3,8 +3,19 @@
   "name": "Humanity Check",
   "version": "1.0",
 
+  "icons": {
+    "16":  "src/popup/assets/icon16.png",
+    "48":  "src/popup/assets/icon48.png",
+    "128": "src/popup/assets/icon128.png"
+  },
+
   "action": {
-    "default_popup": "index.html"
+    "default_popup": "index.html",
+    "default_icon": {
+      "16":  "src/popup/assets/icon16.png",
+      "48":  "src/popup/assets/icon48.png",
+      "128": "src/popup/assets/icon128.png"
+    }
   },
 
   "permissions": ["activeTab", "scripting", "storage"],
@@ -34,6 +45,7 @@
       "type": "module"
     }
   ],
+
   "background": {
     "service_worker": "src/background/background.js"
   }
