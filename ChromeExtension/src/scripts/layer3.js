@@ -1,4 +1,4 @@
-
+export let sharedVideoElement = null;
 async function startCamera() {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ video: true });
@@ -55,10 +55,26 @@ function showPermissionDialog(onAccept) {
     onAccept();
   };
 }
+// export async function startLayer3() {
+//   showPermissionDialog(async () => {
+//     const video = await startCamera();
+//     if(video)
+//         sharedVideoElement=video;
+//     //prcoess frames
+//     // if (video) startFrameStreaming(video);
+//   });
+// }
 export function startLayer3() {
-  showPermissionDialog(async () => {
-    const video = await startCamera();
-    //prcoess frames
-    // if (video) startFrameStreaming(video);
+  return new Promise((resolve) => {
+    showPermissionDialog(async () => {
+      const video = await startCamera();
+
+      if (video) {
+        sharedVideoElement = video;
+        console.log("Camera initialized ");
+      }
+
+      resolve(); 
+    });
   });
 }
