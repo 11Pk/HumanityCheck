@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Humanity Check",
+  "version": "1.0",
+
+  "action": {
+    "default_popup": "index.html"
+  },
+
+  "permissions": ["activeTab", "scripting"],
+    "host_permissions": [
+    "https://web.telegram.org/*",
+    "https://twitter.com/*"
+  ],
+
+  "content_scripts": [
+    {
+      "matches": ["*://web.telegram.org/*","https://meet.google.com/*", "https://leetcode.com/*", "https://hackerrank.com/*"],
+      "js": ["src/scripts/index.js"],
+      "type": "module"
+    }
+  ],
+
+  "background": {
+    "service_worker": "src/background/background.js"
+  }
+}
