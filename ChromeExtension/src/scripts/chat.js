@@ -18,14 +18,14 @@ chrome.runtime.onMessage.addListener((msg) => {
 
 // ------------------ EXTRACT MESSAGE TEXT ------------------
 function getMessageText(msg) {
-    //RECEIVED MESSAGE
+    // 🟢 RECEIVED MESSAGE
     const received = msg.querySelector(".translatable-message");
 
     if (received) {
         return received.innerText.trim();
     }
 
-    //SENT MESSAGE
+    // 🔵 SENT MESSAGE
     let clone = msg.cloneNode(true);
 
     // remove time / extra UI
@@ -83,7 +83,7 @@ function processChat() {
 // ------------------ SEND TO BACKEND ------------------
 async function sendChatData(chat) {
     try {
-        const response = await fetch("http://127.0.0.1:8000/chat-check", {
+        const response = await fetch("http://localhost:3000/chat-check", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
@@ -134,7 +134,7 @@ function showResult(result) {
 const observer = new MutationObserver(() => {
     if (!isActive) return;
 
-    //Debounce to avoid multiple triggers
+    // 🔥 Debounce to avoid multiple triggers
     clearTimeout(debounceTimer);
 
     debounceTimer = setTimeout(() => {
