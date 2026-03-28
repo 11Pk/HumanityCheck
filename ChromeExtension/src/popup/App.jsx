@@ -5,7 +5,8 @@ function App() {
 const [status, setStatus]   = useState("Idle");
   const [result, setResult]   = useState(null);   // score result from twitterProfile.js
   const [data,   setData]     = useState(null);   // raw scraped data
-  const [page,   setPage]     = useState("other"); // "twitter" | "telegram" | "other"
+  const [page,   setPage]     = useState("other"); // "twitter" | "telegram" | "other
+   const [status1, setStatus1] = useState("Idle");
 
   // ── Detect which page the user is on ──
   useEffect(() => {
@@ -31,6 +32,17 @@ const [status, setStatus]   = useState("Idle");
     return () => chrome.runtime.onMessage.removeListener(handler);
   }, []);
 
+    const startDetection = () => {
+    setStatus1("Starting...");
+
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (!tabs.length) return;
+
+      chrome.tabs.sendMessage(tabs[0].id, { action: "START" });
+
+      setStatus1("Detection Started");
+    });
+  };
   // ── Send START to content script ──
   const handleStart = () => {
     setStatus("Analyzing...");
@@ -131,6 +143,29 @@ const [status, setStatus]   = useState("Idle");
           )}
         </div>
       )}
+
+      <div style={{ padding: "20px", width: "250px" }}>
+      <h3>AI Chat Detector</h3>
+
+      <button
+        onClick={startDetection}
+        style={{
+          padding: "10px",
+          width: "100%",
+          background: "#4CAF50",
+          color: "white",
+          border: "none",
+          borderRadius: "5px",
+          cursor: "pointer"
+        }}
+      >
+        Start Detection
+      </button>
+
+      <p style={{ marginTop: "10px" }}>
+        Status: {status1}
+      </p>
+    </div>
     </div>
   );
 }
