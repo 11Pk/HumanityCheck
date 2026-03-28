@@ -16,8 +16,20 @@
   ],
 
   "host_permissions": [
-    "<all_urls>"
-  ],
+    "<all_urls>"],
+  "content_security_policy": {
+  "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'",
+  "content_scripts": "script-src 'self' https://cdn.jsdelivr.net https://storage.googleapis.com; object-src 'self'"
+},
+
+"web_accessible_resources": [
+  {
+    "resources": ["mediapipe-wasm/*","face_landmarker.task","src/offscreen/offscreen.html" , "src/audio/offscreen1.html", "src/audio/offscreen1.js"],
+    "matches": ["<all_urls>"]
+  }
+],
+
+
 
   "content_scripts": [
     {
@@ -36,12 +48,7 @@
 
   "background": {
     "service_worker": "src/background/background.js"
-  },
+  }
 
-  "web_accessible_resources": [
-    {
-      "resources": ["src/audio/offscreen1.html", "src/audio/offscreen1.js"],
-      "matches": ["<all_urls>"]
-    }
-  ]
+  
 }
