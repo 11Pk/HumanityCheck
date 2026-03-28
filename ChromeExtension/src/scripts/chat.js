@@ -1,146 +1,145 @@
-
-
-console.log("Content script loaded");
+console.log("Telegram content script loaded");
 
 // ------------------ CONFIG ------------------
-const MESSAGE_THRESHOLD = 5;
+const MESSAGE_THRESHOLD = 6;
 
 // ------------------ STATE ------------------
-let lastMessageCount = 0;
-let totalMessages = 0;
 let isActive = false;
+let debounceTimer = null;
 
-// ------------------ START DETECTION ON CLICK ------------------
+// ------------------ START DETECTION ------------------
 chrome.runtime.onMessage.addListener((msg) => {
-    if (msg.action === "START") {
+    if (msg.action === "START_CHAT") {
         isActive = true;
         console.log("Detection started");
+        processChat(); // run immediately
     }
 });
-function getMessageText(msg) {
-    let span = msg.querySelector("span");
 
-    //  RECEIVED MESSAGE
-    if (span && span.innerText.trim() !== "") {
-        return span.innerText.trim();
+// ------------------ EXTRACT MESSAGE TEXT ------------------
+function getMessageText(msg) {
+    // 🟢 RECEIVED MESSAGE
+    const received = msg.querySelector(".translatable-message");
+
+    if (received) {
+        return received.innerText.trim();
     }
 
-    //  SENT MESSAGE
-    // Extract only direct text (ignore span)
-    let text = "";
+    // 🔵 SENT MESSAGE
+    let clone = msg.cloneNode(true);
 
-    msg.childNodes.forEach(node => {
-        if (node.nodeType === Node.TEXT_NODE) {
-            text += node.textContent;
-        }
-    });
+    // remove time / extra UI
+    const time = clone.querySelector(".time");
+    if (time) time.remove();
 
-    return text.trim();
+    return clone.innerText.trim();
 }
 
+// ------------------ DETECT SENDER ------------------
 function isMyMessage(msg) {
-    return msg.closest(".message-out") !== null;
+    // If NO translatable span → it's sent by user
+    return !msg.querySelector(".translatable-message");
 }
 
-// ------------------ EXTRACT ONLY NEW MESSAGES ------------------
-function extractNewMessages() {
-    const messages = document.querySelectorAll(".message-spoiler-container");
+// ------------------ MAIN PROCESS ------------------
+function processChat() {
+    const messages = document.querySelectorAll(".message.spoilers-container");
 
-    let newMessages = [];
+    if (!messages.length) {
+        console.log("No messages found");
+        return;
+    }
 
-    for (let i = lastMessageCount; i < messages.length; i++) {
-        let msg = messages[i];
+    let chat = [];
 
-        let text = getMessageText(msg);
+    messages.forEach((msg) => {
+        const text = getMessageText(msg);
 
-        if (text !== "") {
-            let sender = isMyMessage(msg) ? "me" : "other";
-
-            newMessages.push({
-                text: text,
-                sender: sender,
+        if (text && text.length > 1) {
+            chat.push({
+                text: text.replace(/\n/g, " "),
+                sender: isMyMessage(msg) ? "me" : "other",
                 time: Date.now()
             });
         }
+    });
+
+    console.log("Total messages:", chat.length);
+
+    // ------------------ THRESHOLD CHECK ------------------
+    if (chat.length < MESSAGE_THRESHOLD) {
+        showResult({ status: "collecting", count: chat.length });
+        return;
     }
 
-    lastMessageCount = messages.length;
-    totalMessages = messages.length;
+    // ------------------ TAKE LAST 6 ------------------
+    const lastMessages = chat.slice(-MESSAGE_THRESHOLD);
 
-    return newMessages;
+    console.log("Sending:", lastMessages);
+
+    sendChatData(lastMessages);
 }
 
-// ------------------ SEND DATA TO BACKEND ------------------
-async function sendChatData(newChat) {
+// ------------------ SEND TO BACKEND ------------------
+async function sendChatData(chat) {
     try {
-        let response = await fetch("http://localhost:3000/chat-check", {
+        const response = await fetch("http://localhost:3000/chat-check", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify({ chat: newChat })
+            body: JSON.stringify({ chat })
         });
 
-        let result = await response.json();
+        const result = await response.json();
 
         console.log("Bot Score:", result.score);
 
         showResult(result);
 
     } catch (error) {
-        console.error("Error sending data:", error);
+        console.error("Backend error:", error);
     }
 }
 
 // ------------------ UI OVERLAY ------------------
 function showResult(result) {
-    let existing = document.getElementById("ai-detector-overlay");
+    let overlay = document.getElementById("ai-detector-overlay");
 
-    if (!existing) {
-        let div = document.createElement("div");
-        div.id = "ai-detector-overlay";
+    if (!overlay) {
+        overlay = document.createElement("div");
+        overlay.id = "ai-detector-overlay";
 
-        div.style.position = "fixed";
-        div.style.top = "10px";
-        div.style.right = "10px";
-        div.style.background = "#000";
-        div.style.color = "#fff";
-        div.style.padding = "10px";
-        div.style.zIndex = "9999";
-        div.style.borderRadius = "8px";
+        overlay.style.position = "fixed";
+        overlay.style.top = "10px";
+        overlay.style.right = "10px";
+        overlay.style.background = "#000";
+        overlay.style.color = "#fff";
+        overlay.style.padding = "10px";
+        overlay.style.zIndex = "9999";
+        overlay.style.borderRadius = "8px";
+        overlay.style.fontSize = "12px";
 
-        document.body.appendChild(div);
-        existing = div;
+        document.body.appendChild(overlay);
     }
 
-    if (totalMessages < MESSAGE_THRESHOLD) {
-        existing.innerText = `Collecting data... (${totalMessages}/${MESSAGE_THRESHOLD})`;
+    if (result.status === "collecting") {
+        overlay.innerText = `Collecting data... (${result.count}/${MESSAGE_THRESHOLD})`;
     } else {
-        existing.innerText = `AI Probability: ${result.score}`;
+        overlay.innerText = `AI Probability: ${result.score}`;
     }
 }
 
-// ------------------ OBSERVER (REAL-TIME DETECTION) ------------------
+// ------------------ OPTIMIZED OBSERVER ------------------
 const observer = new MutationObserver(() => {
-
-    //  Only run after user clicks START
     if (!isActive) return;
 
-    let newMessages = extractNewMessages();
+    // 🔥 Debounce to avoid multiple triggers
+    clearTimeout(debounceTimer);
 
-    //  If no new messages → do nothing
-    if (newMessages.length === 0) return;
-
-    console.log("New messages:", newMessages);
-
-    //  Threshold check
-    if (totalMessages < MESSAGE_THRESHOLD) {
-        showResult({ status: "collecting" });
-        return;
-    }
-
-    //  Send only NEW messages
-    sendChatData(newMessages);
+    debounceTimer = setTimeout(() => {
+        processChat();
+    }, 800); // wait for DOM to settle
 });
 
 // ------------------ START OBSERVING ------------------
@@ -148,3 +147,5 @@ observer.observe(document.body, {
     childList: true,
     subtree: true
 });
+
+

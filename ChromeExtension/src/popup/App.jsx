@@ -94,34 +94,58 @@ useEffect(() => {
     const handler = (msg) => {
       if (msg.action === "PROFILE_RESULT") {
         setResult(msg.result);
-        setData(msg.data);
+        setData(msg.profileData);
         setStatus("Done");
       }
     };
+
     chrome.runtime.onMessage.addListener(handler);
     return () => chrome.runtime.onMessage.removeListener(handler);
   }, []);
 
-  const startDetection = () => {
+  // 🔵 Twitter Profile Analysis
+  const handleStart = () => {
+    setStatus("Analyzing...");
+    setResult(null);
+
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (!tabs.length) return;
+
+      chrome.tabs.sendMessage(tabs[0].id, {
+        action: "START_PROFILE", // 🔥 FIXED
+      });
+    });
+  };
+
+  // 🟢 Telegram Chat Detection
+  const startTelegramDetection = () => {
     setStatus1("Starting...");
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (!tabs.length) return;
-      chrome.tabs.sendMessage(tabs[0].id, { action: "START" });
+
+      chrome.tabs.sendMessage(tabs[0].id, {
+        action: "START_CHAT", // 🔥 FIXED
+      });
+
       setStatus1("Detection Started");
     });
   };
 
-  const handleStart = () => {
-    setStatus("Analyzing...");
-    setResult(null);
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (!tabs.length) return;
-      chrome.tabs.sendMessage(tabs[0].id, { action: "START" });
-    });
-  };
+  // const handleStart = () => {
+  //   setStatus("Analyzing...");
+  //   setResult(null);
+  //   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+  //     if (!tabs.length) return;
+  //     chrome.tabs.sendMessage(tabs[0].id, { action: "START" });
+  //   });
+  // };
 
   const scoreColor = result
-    ? (result.score >= 70 ? "#00ba7c" : result.score >= 40 ? "#ffad1f" : "#e0245e")
+    ? result.score >= 70
+      ? "#00ba7c"
+      : result.score >= 40
+      ? "#ffad1f"
+      : "#e0245e"
     : "#888";
 
   const combined =
@@ -136,9 +160,9 @@ useEffect(() => {
     combinedPct >= 45   ? "#ffad1f" : "#e0245e";
 
   return (
-    <div style={{ width: 280, padding: "16px", fontFamily: "-apple-system, sans-serif", fontSize: 13 }}>
-
-      {/* Header */}
+    <div style={{ width: 280, padding: 16, fontFamily: "-apple-system", fontSize: 13 }}>
+      
+      {/* HEADER */}
       <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 12 }}>
         HumanityCheck
         <span style={{ fontSize: 11, fontWeight: 400, color: "#888", marginLeft: 8 }}>
@@ -200,74 +224,64 @@ useEffect(() => {
           </button>
 
           {!result && (
-            <div style={{ color: "#888", fontSize: 12, textAlign: "center" }}>
+            <div style={{ color: "#888", textAlign: "center" }}>
               {status === "Idle"
-                ? (page === "twitter"
-                    ? "Go to a Twitter profile, then click Analyze"
-                    : "Navigate to a supported page")
+                ? "Go to a Twitter profile"
                 : status}
             </div>
           )}
 
           {result && data && (
             <div style={{ background: "#f7f9f9", borderRadius: 12, padding: 14 }}>
-              <div style={{ textAlign: "center", marginBottom: 12 }}>
+              
+              <div style={{ textAlign: "center", marginBottom: 10 }}>
                 <div style={{ fontSize: 24 }}>{result.emoji}</div>
-                <div style={{ fontSize: 17, fontWeight: 700, color: scoreColor }}>{result.label}</div>
-                <div style={{ fontSize: 28, fontWeight: 700, color: scoreColor }}>
-                  {result.score}<span style={{ fontSize: 14, fontWeight: 400 }}>/100</span>
+                <div style={{ fontWeight: 700, color: scoreColor }}>
+                  {result.label}
+                </div>
+                <div style={{ fontSize: 26, color: scoreColor }}>
+                  {result.score}/100
                 </div>
               </div>
 
-              <div style={{ background: "#e1e8ed", borderRadius: 6, height: 7, marginBottom: 12, overflow: "hidden" }}>
-                <div style={{
-                  height: "100%", width: `${result.score}%`,
-                  background: scoreColor, borderRadius: 6,
-                  transition: "width 0.5s ease",
-                }} />
+              <div style={{ fontSize: 12 }}>
+                <div>👥 Followers: {data.followers}</div>
+                <div>➡️ Following: {data.following}</div>
+                <div>📊 Ratio: {data.followerFollowingRatio?.toFixed(2)}</div>
+                <div>📅 Age: {data.accountAgeDays} days</div>
               </div>
-
-              <div style={{ fontSize: 12, lineHeight: 1.9, marginBottom: 10 }}>
-                <div>👥 Followers: <b>{data.followers.toLocaleString()}</b></div>
-                <div>➡️ Following: <b>{data.following.toLocaleString()}</b></div>
-                <div>📊 Ratio: <b>{data.ratio}</b></div>
-                {data.accountAgeDays !== null && <div>📅 Age: <b>{data.accountAgeDays} days</b></div>}
-                <div>✏️ Bio: <b>{data.hasBio ? "Set" : "Missing"}</b></div>
-                <div>🖼 Photo: <b>{data.hasDefaultPhoto ? "Default ⚠️" : "Custom ✓"}</b></div>
-                <div>📋 Completeness: <b>{data.completeness}%</b></div>
-              </div>
-
-              {result.positives.length > 0 && (
-                <div style={{ fontSize: 12, lineHeight: 1.8, marginBottom: 6 }}>
-                  {result.positives.map((p, i) => <div key={i} style={{ color: "#00ba7c" }}>✓ {p}</div>)}
-                </div>
-              )}
-
-              {result.flags.length > 0 && (
-                <div style={{ fontSize: 12, lineHeight: 1.8 }}>
-                  {result.flags.map((f, i) => <div key={i} style={{ color: "#e0245e" }}>⚑ {f}</div>)}
-                </div>
-              )}
             </div>
           )}
-
-          <div style={{ padding: "20px 0 0" }}>
-            <h3 style={{ margin: "0 0 10px", fontSize: 13 }}>AI Chat Detector</h3>
-            <button
-              onClick={startDetection}
-              style={{
-                padding: "10px", width: "100%",
-                background: "#4CAF50", color: "white",
-                border: "none", borderRadius: "5px", cursor: "pointer",
-              }}
-            >
-              Start Detection
-            </button>
-            <p style={{ marginTop: "10px", fontSize: 12, color: "#555" }}>
-              Status: {status1}
-            </p>
-          </div>
         </>
+      )}
+
+      {/* ================= TELEGRAM UI ================= */}
+      {page === "telegram" && (
+        <div style={{ marginTop: 10 }}>
+          <button
+            onClick={startTelegramDetection}
+            style={{
+              width: "100%",
+              padding: 10,
+              background: "#4CAF50",
+              color: "white",
+              border: "none",
+              borderRadius: 6,
+              cursor: "pointer",
+            }}
+          >
+            Start Chat Detection
+          </button>
+
+          <p style={{ marginTop: 10 }}>Status: {status1}</p>
+        </div>
+      )}
+
+      {/* ================= OTHER ================= */}
+      {page === "other" && (
+        <div style={{ textAlign: "center", color: "#888" }}>
+          Open Twitter or Telegram
+        </div>
       )}
     </div>
   );
