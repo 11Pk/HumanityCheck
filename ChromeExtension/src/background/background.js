@@ -13,11 +13,11 @@ async function ensureOffscreen() {
       justification: "MediaPipe face analysis for humanity check"
     });
     offscreenCreated = true;
-    console.log("Offscreen created ✅");
+    console.log("Offscreen created ");
   } catch (err) {
     if (err.message?.includes("Only a single offscreen")) {
       offscreenCreated = true;
-      console.log("Offscreen already exists ✅");
+      console.log("Offscreen already exists ");
     } else {
       console.error("Offscreen FAILED:", err.message); // ← exact error
     }

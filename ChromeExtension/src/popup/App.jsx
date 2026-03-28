@@ -117,7 +117,7 @@ useEffect(() => {
     });
   };
 
-  // 🟢 Telegram Chat Detection
+  // Telegram Chat Detection
   const startTelegramDetection = () => {
     setStatus1("Starting...");
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {

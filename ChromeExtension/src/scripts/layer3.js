@@ -8,10 +8,11 @@ async function startCamera() {
     cameraVideo  = document.createElement("video");
     cameraVideo.srcObject = cameraStream;
     cameraVideo.autoplay  = true;
+    cameraVideo.style.display = "none";
     cameraVideo.style.cssText = "position:fixed;bottom:10px;right:10px;width:200px;z-index:9999;";
     document.body.appendChild(cameraVideo);
     await new Promise(res => cameraVideo.onloadedmetadata = res);
-    console.log("Camera started ✅");
+    console.log("Camera started ");
     return true;
   } catch (err) {
     console.error("Camera failed:", err);
@@ -42,7 +43,7 @@ function showPermissionDialog(onAccept) {
   box.style.cssText = "background:#fff;padding:20px;border-radius:10px;";
   box.innerHTML = `
     <h3>HumanityCheck</h3>
-    <p>This extension needs camera access for verification.</p>
+    <p>HumanityCheck extension needs camera access for verification.</p>
     <button id="allowBtn">Allow</button>
   `;
   overlay.appendChild(box);
