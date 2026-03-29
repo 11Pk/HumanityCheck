@@ -1,10 +1,12 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, File, UploadFile
+# from services.audio_analyzer import analyze_audio
 from routes.chat import router as chat_router
+from routes.video import router as video_router
+from fastapi.middleware.cors import CORSMiddleware
 from routes.audioRoute import router as audio_router
 # from routes.liveness import router as liveness_router
 # from routes.active_liveness import router as active_router
 # from routes.video import router as video_router
-from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
@@ -21,11 +23,12 @@ app.add_middleware(
 
 # include chat route
 app.include_router(chat_router)
+app.include_router(video_router)
 app.include_router(audio_router)
 # include liveness route
 # app.include_router(liveness_router)
 # app.include_router(active_router)
-# app.include_router(video_router)
+
 
 @app.get("/")
 def home():

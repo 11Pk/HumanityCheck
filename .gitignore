@@ -34,3 +34,9 @@ backend/venv/
 *.njsproj
 *.sln
 *.sw?
+
+__pycache__/
+*.pyc
+models/weights/
+*.h5
+*.pth

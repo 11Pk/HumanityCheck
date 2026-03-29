@@ -124,7 +124,7 @@ useEffect(() => {
       if (!tabs.length) return;
 
       chrome.tabs.sendMessage(tabs[0].id, {
-        action: "START_CHAT", // 🔥 FIXED
+        action: "START_CHAT", //FIXED
       });
 
       setStatus1("Detection Started");
