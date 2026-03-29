@@ -72,6 +72,7 @@ async function startMonitoring() {
  
 // Push score updates to the popup without waiting for it to poll
 function notifyScoreUpdate() {
+  
   chrome.runtime.sendMessage({
     action: "SCORE_UPDATE",
     layer3: humanityScores.layer3,
@@ -107,7 +108,8 @@ if (hostname.includes("twitter.com") || hostname.includes("x.com")) {
   // Profile logic
   import("./twitterProfile.js").then(({ runProfileAnalysis }) => {
     chrome.runtime.onMessage.addListener((msg) => {
-      if (msg.action === "START") runProfileAnalysis();
+      
+     if (msg.action === "START_PROFILE") runProfileAnalysis();    //1
     });
   });
 

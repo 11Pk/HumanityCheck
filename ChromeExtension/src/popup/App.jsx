@@ -244,12 +244,13 @@ useEffect(() => {
                 </div>
               </div>
 
-              <div style={{ fontSize: 12 }}>
-                <div>👥 Followers: {data.followers}</div>
+              {/* <div style={{ fontSize: 12 }}> */}
+                {/* <div>👥 Followers: {data.followers}</div>
                 <div>➡️ Following: {data.following}</div>
-                <div>📊 Ratio: {data.followerFollowingRatio?.toFixed(2)}</div>
-                <div>📅 Age: {data.accountAgeDays} days</div>
-              </div>
+                <div>📊 Ratio: {data.ratio?.toFixed(2)}</div>  */}
+                {/* <div>📊 Ratio: {data.followerFollowingRatio?.toFixed(2)}</div>  3*/}
+                {/* <div>📅 Age: {data.accountAgeDays} days</div> */}
+              {/* </div> */}
             </div>
           )}
         </>
