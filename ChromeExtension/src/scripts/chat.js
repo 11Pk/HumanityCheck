@@ -83,7 +83,7 @@ function processChat() {
 // ------------------ SEND TO BACKEND ------------------
 async function sendChatData(chat) {
     try {
-        const response = await fetch("http://localhost:3000/chat-check", {
+        const response = await fetch("http://127.0.0.1:8000/chat-check", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
