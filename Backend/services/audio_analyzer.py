@@ -1,98 +1,109 @@
 import numpy as np
 import librosa
 import io
-import soundfile as sf
-from pydub import AudioSegment
+import av  # pip install av  ← bundles its own ffmpeg, no system install needed
 
-# 🔧 Convert WEBM → WAV
-def convert_to_wav(audio_bytes):
-    audio = AudioSegment.from_file(io.BytesIO(audio_bytes), format="webm")
-    
-    wav_io = io.BytesIO()
-    audio.export(wav_io, format="wav")
-    wav_io.seek(0)
+# ─────────────────────────────────────────────────────────────────────────────
+# Convert WEBM → raw float32 numpy array using PyAV (no ffmpeg required)
+# pydub was removed because it calls system ffmpeg which is not installed
+# ─────────────────────────────────────────────────────────────────────────────
+def convert_to_numpy(audio_bytes: bytes):
+    """
+    Decode any audio format (webm, opus, mp4, etc.) directly to a
+    float32 numpy array at the native sample rate, using PyAV.
+    No ffmpeg binary needed — av bundles its own.
+    """
+    container = av.open(io.BytesIO(audio_bytes))
+    stream = container.streams.audio[0]
+    sr = stream.codec_context.sample_rate
 
-    return wav_io
+    frames = []
+    for frame in container.decode(stream):
+        # Convert frame to float32 numpy array (shape: channels × samples)
+        arr = frame.to_ndarray().astype(np.float32)
+        frames.append(arr)
+
+    container.close()
+
+    if not frames:
+        raise ValueError("No audio frames decoded from input")
+
+    # Concatenate along time axis → shape: (channels, total_samples)
+    audio = np.concatenate(frames, axis=1)
+
+    # Stereo → mono
+    if audio.shape[0] > 1:
+        audio = np.mean(audio, axis=0)
+    else:
+        audio = audio[0]
+
+    return audio, sr
 
 
-def analyze_audio(audio_bytes):
-    # ---------------- CONVERT ---------------- #
-    wav_io = convert_to_wav(audio_bytes)
+def analyze_audio(audio_bytes: bytes):
 
-    # ---------------- LOAD ---------------- #
-    audio, sr = sf.read(wav_io)
+    # ── DECODE ────────────────────────────────────────────────────────────────
+    audio, sr = convert_to_numpy(audio_bytes)
 
-    # Convert stereo → mono
-    if len(audio.shape) > 1:
-        audio = np.mean(audio, axis=1)
+    # ── NORMALIZE ─────────────────────────────────────────────────────────────
+    audio = audio / (np.max(np.abs(audio)) + 1e-6)
 
-    # Normalize
-    audio = audio / np.max(np.abs(audio) + 1e-6)
-
-    # Resample → 16kHz
+    # ── RESAMPLE → 16 kHz ────────────────────────────────────────────────────
     if sr != 16000:
         audio = librosa.resample(audio, orig_sr=sr, target_sr=16000)
         sr = 16000
 
-    # Trim silence
+    # ── TRIM SILENCE ─────────────────────────────────────────────────────────
     audio, _ = librosa.effects.trim(audio)
 
-    # ---------------- FEATURE EXTRACTION ---------------- #
+    # ── FEATURE EXTRACTION ───────────────────────────────────────────────────
 
-#     # 🎤 Pitch
-#     pitch, _, _ = librosa.pyin(audio, fmin=50, fmax=300)
-#     pitch = pitch[~np.isnan(pitch)]
-#     pitch_var = np.var(pitch) if len(pitch) > 0 else 0
+    # 🎤 Pitch
+    pitch, _, _ = librosa.pyin(audio, fmin=50, fmax=300)
+    pitch = pitch[~np.isnan(pitch)]
+    pitch_var = float(np.var(pitch)) if len(pitch) > 0 else 0.0
 
-#     # 🔊 Energy
-#     energy = librosa.feature.rms(y=audio)[0]
-#     energy_var = np.var(energy)
+    # 🔊 Energy
+    energy = librosa.feature.rms(y=audio)[0]
+    energy_var = float(np.var(energy))
 
     # ⏱️ Pause detection
     intervals = librosa.effects.split(audio, top_db=25)
-
     pauses = []
     for i in range(1, len(intervals)):
-        prev_end = intervals[i-1][1]
-        curr_start = intervals[i][0]
-        pause = (curr_start - prev_end) / sr
+        pause = (intervals[i][0] - intervals[i-1][1]) / sr
         pauses.append(pause)
+    pause_var = float(np.var(pauses))  if len(pauses) > 0 else 0.0
+    avg_pause = float(np.mean(pauses)) if len(pauses) > 0 else 0.0
 
-#     pause_var = np.var(pauses) if len(pauses) > 0 else 0
-#     avg_pause = np.mean(pauses) if len(pauses) > 0 else 0
-
-    # 🔁 Zero Crossing Rate (noise)
+    # 🔁 Zero Crossing Rate
     zcr = librosa.feature.zero_crossing_rate(audio)[0]
-    zcr_var = np.var(zcr)
+    zcr_var = float(np.var(zcr))
 
-    # 🎼 Spectral flatness (important for AI voices)
-    spectral_flatness = librosa.feature.spectral_flatness(y=audio)[0]
-    flatness_var = np.var(spectral_flatness)
+    # 🎼 Spectral Flatness
+    flatness = librosa.feature.spectral_flatness(y=audio)[0]
+    flatness_var = float(np.var(flatness))
 
-    # 🎼 MFCC (texture)
+    # 🎼 MFCC
     mfcc = librosa.feature.mfcc(y=audio, sr=sr, n_mfcc=13)
-    mfcc_var = np.mean(np.var(mfcc, axis=1))
+    mfcc_var = float(np.mean(np.var(mfcc, axis=1)))
 
-#     # ---------------- SCORING ---------------- #
+    # ── SCORING ───────────────────────────────────────────────────────────────
+    score = 0
+    flags = []
 
-#     score = 0
-#     flags = []
-
-    # 🎤 Pitch
     if pitch_var < 20:
         score += 20
         flags.append("Low pitch variation")
     elif pitch_var > 300:
         score -= 10
 
-    # 🔊 Energy
     if energy_var < 0.001:
         score += 15
         flags.append("Flat energy")
     elif energy_var > 0.02:
         score -= 10
 
-    # ⏱️ Pause behavior
     if avg_pause < 0.15:
         score += 10
         flags.append("Short pauses")
@@ -100,43 +111,33 @@ def analyze_audio(audio_bytes):
         score += 10
         flags.append("Uniform pauses")
 
-    # 🔁 Noise (ZCR)
     if zcr_var < 0.0001:
         score += 10
         flags.append("Too clean signal")
 
-    # 🎼 Spectral flatness
     if flatness_var < 0.00001:
         score += 10
         flags.append("Low spectral variation")
 
-    # 🎼 MFCC
     if mfcc_var < 50:
         score += 10
         flags.append("Low vocal texture variation")
 
-#     # ---------------- NORMALIZE ---------------- #
-
-    base = 50
-    ai_probability = base + score
-
-    ai_probability = max(0, min(100, ai_probability))
-
+    # ── NORMALIZE SCORE → 0-100 ───────────────────────────────────────────────
+    ai_probability = max(0, min(100, 50 + score))
     label = "Likely AI" if ai_probability > 60 else "Likely Human"
-
-    # ---------------- RESPONSE ---------------- #
 
     return {
         "aiProbability": int(ai_probability),
         "label": label,
         "features": {
-            "pitchVariance": float(pitch_var),
-            "energyVariance": float(energy_var),
-            "pauseVariance": float(pause_var),
-            "avgPause": float(avg_pause),
-            "zcrVariance": float(zcr_var),
-            "spectralFlatnessVar": float(flatness_var),
-            "mfccVar": float(mfcc_var)
+            "pitchVariance":      pitch_var,
+            "energyVariance":     energy_var,
+            "pauseVariance":      pause_var,
+            "avgPause":           avg_pause,
+            "zcrVariance":        zcr_var,
+            "spectralFlatnessVar": flatness_var,
+            "mfccVar":            mfcc_var
         },
         "flags": flags
     }

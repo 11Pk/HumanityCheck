@@ -3,12 +3,10 @@ from fastapi import FastAPI, File, UploadFile
 from routes.chat import router as chat_router
 from routes.video import router as video_router
 from fastapi.middleware.cors import CORSMiddleware
-
-
-# from fastapi import FastAPI
-
+from routes.audioRoute import router as audio_router
 # from routes.liveness import router as liveness_router
 # from routes.active_liveness import router as active_router
+# from routes.video import router as video_router
 
 app = FastAPI()
 
@@ -26,18 +24,14 @@ app.add_middleware(
 # include chat route
 app.include_router(chat_router)
 app.include_router(video_router)
+app.include_router(audio_router)
 # include liveness route
 # app.include_router(liveness_router)
 # app.include_router(active_router)
-# @app.post("/analyze-audio")
-# async def analyze(file: UploadFile = File(...)):
-#     contents = await file.read()
-    
-#     result = analyze_audio(contents)
-    
-#     return result
+
 
 @app.get("/")
 def home():
     return {"message": "Backend Running"}
 
+# @app.post("/analy")

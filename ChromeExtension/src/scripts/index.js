@@ -96,13 +96,15 @@ export function detectPlatform() {
     return;
   }
 }
- 
+
 setInterval(detectPlatform, 2000);
- 
+
 const hostname = window.location.hostname;
  
 // ── Twitter / X ──
 if (hostname.includes("twitter.com") || hostname.includes("x.com")) {
+
+  // Profile logic
   import("./twitterProfile.js").then(({ runProfileAnalysis }) => {
     chrome.runtime.onMessage.addListener((msg) => {
       if (msg.action === "START") runProfileAnalysis();
@@ -112,6 +114,7 @@ if (hostname.includes("twitter.com") || hostname.includes("x.com")) {
    import("./twitterVideo.js").then(() => {
     console.log("Twitter video module loaded");
   });
+  import("./twitteraudio.js");
 }
 
 

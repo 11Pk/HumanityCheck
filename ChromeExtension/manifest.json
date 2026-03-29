@@ -1,3 +1,4 @@
+
 {
   "manifest_version": 3,
   "name": "Humanity Check",
@@ -7,6 +8,15 @@
     "default_popup": "index.html"
   },
 
+  "permissions": [
+    "tabs",
+    "scripting",
+    "tabCapture",
+    "offscreen"
+  ],
+
+  "host_permissions": [
+    "<all_urls>"],
   "content_security_policy": {
   "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'",
   "content_scripts": "script-src 'self' https://cdn.jsdelivr.net https://storage.googleapis.com; object-src 'self'"
@@ -14,27 +24,23 @@
 
 "web_accessible_resources": [
   {
-    "resources": ["mediapipe-wasm/*","face_landmarker.task","src/offscreen/offscreen.html"],
+    "resources": ["mediapipe-wasm/*","face_landmarker.task","src/offscreen/offscreen.html" , "src/audio/offscreen1.html", "src/audio/offscreen1.js"],
     "matches": ["<all_urls>"]
   }
 ],
 
-  "permissions": ["activeTab", "scripting","tabs","offscreen"],
-    "host_permissions": [
-    "https://web.telegram.org/*",
-    "https://twitter.com/*",
-    "https://x.com/*",
-    "https://meet.google.com/*",
-    "https://leetcode.com/*",
-    "https://hackerrank.com/*"
-  ],
+
 
   "content_scripts": [
     {
-      
-
-      "matches": ["*://web.telegram.org/*","*://twitter.com/*",
-        "*://x.com/*","https://meet.google.com/*", "https://leetcode.com/*", "https://hackerrank.com/*"],
+      "matches": [
+        "*://web.telegram.org/*",
+        "*://twitter.com/*",
+        "*://x.com/*",
+        "https://meet.google.com/*",
+        "https://leetcode.com/*",
+        "https://hackerrank.com/*"
+      ],
       "js": ["src/scripts/index.js"],
       "type": "module"
     }
@@ -43,4 +49,6 @@
   "background": {
     "service_worker": "src/background/background.js"
   }
+
+  
 }
