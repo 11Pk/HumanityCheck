@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import List
-from chatmodel import analyze_chat  # your existing model file
+from models.chat_model import analyze_chat  # your existing model file
 
 router = APIRouter()
 
