@@ -108,8 +108,14 @@ if (hostname.includes("twitter.com") || hostname.includes("x.com")) {
       if (msg.action === "START") runProfileAnalysis();
     });
   });
+
+   import("./twitterVideo.js").then(() => {
+    console.log("Twitter video module loaded");
+  });
 }
- 
+
+
+
 // ── Telegram ──
 if (hostname.includes("web.telegram.org")) {
   import("./chat.js");
